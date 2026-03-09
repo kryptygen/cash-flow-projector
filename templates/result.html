@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Forecast Result</title>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet"
+  >
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+
+    /* ── TOKENS ── */
+    :root {
+      --cream:      #f5f0e8;
+      --linen:      #ede5d8;
+      --sand:       #e4d9cb;
+      --sage:       #8a9e8c;
+      --sage-dk:    #6b7f6d;
+      --terracotta: #c27a5a;
+      --charcoal:   #2e2a25;
+      --muted:      #7a7168;
+      --border:     #d6cdc0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html,
+    body {
+      height: 100%;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+    }
+
+    /* ── PAGE SHELL ── */
+    .page {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+
+    /* ────────────────────────────
+       SIDEBAR
+    ──────────────────────────── */
+    .sidebar {
+      grid-row: 1 / -1;
+      background: var(--charcoal);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 260px; height: 260px;
+      border-radius: 60% 40% 70% 30% / 50% 60% 40% 70%;
+      background: radial-gradient(ellipse, rgba(138, 158, 140, 0.14) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .sidebar::after {
+      content: '';
+      position: absolute;
+      bottom: -50px; left: -50px;
+      width: 220px; height: 220px;
+      border-radius: 40% 60% 30% 70% / 60% 40% 70% 50%;
+      background: radial-gradient(ellipse, rgba(194, 122, 90, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .sidebar-top,
+    .sidebar-bottom {
+      position: relative;
+      z-index: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(138, 158, 140, 0.15);
+      border: 1px solid rgba(138, 158, 140, 0.3);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--sage);
+      margin-bottom: 28px;
+    }
+
+    .badge-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--sage);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .sidebar-heading {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 36px;
+      line-height: 1.05;
+      color: var(--cream);
+      letter-spacing: -0.01em;
+    }
+
+    .sidebar-heading em {
+      font-style: italic;
+      color: var(--terracotta);
+    }
+
+    .sidebar-target {
+      margin-top: 16px;
+      font-size: 12px;
+      font-weight: 300;
+      color: rgba(245, 240, 232, 0.45);
+    }
+
+    .sidebar-target span {
+      display: block;
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--cream);
+    }
+
+    .sidebar-rule {
+      height: 1px;
+      background: linear-gradient(90deg, rgba(214, 205, 192, 0.2), transparent);
+      margin: 28px 0;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      color: rgba(245, 240, 232, 0.4);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .back-link:hover { color: var(--cream); }
+
+    .back-link:hover svg { transform: translateX(-3px); }
+
+    .back-link svg {
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    /* ────────────────────────────
+       MAIN CONTENT
+    ──────────────────────────── */
+    .main {
+      padding: 48px 52px;
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+      overflow-y: auto;
+    }
+
+    .section-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--terracotta);
+      margin-bottom: 14px;
+    }
+
+    /* ── CHART ── */
+    .chart-section {
+      opacity: 0;
+      animation: fadeIn 0.6s 0.2s ease forwards;
+    }
+
+    .chart-wrap {
+      background: var(--linen);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 28px 28px 20px;
+    }
+
+    /* ── TABLE ── */
+    .table-section {
+      opacity: 0;
+      animation: fadeIn 0.6s 0.4s ease forwards;
+    }
+
+    .table-wrap {
+      background: var(--linen);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .forecast-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .forecast-table thead tr {
+      background: var(--charcoal);
+    }
+
+    .forecast-table thead th {
+      padding: 12px 18px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cream);
+    }
+
+    .forecast-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .forecast-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .forecast-table tbody tr:hover {
+      background: var(--sand);
+    }
+
+    .forecast-table tbody td {
+      padding: 11px 18px;
+      color: var(--charcoal);
+      font-weight: 300;
+    }
+
+    .forecast-table tbody td:last-child {
+      font-weight: 500;
+      color: var(--sage-dk);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+  <div class="page">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar">
+
+      <div class="sidebar-top">
+
+        <div class="badge">
+          <span class="badge-dot"></span> Forecast Result
+        </div>
+
+        <h1 class="sidebar-heading">
+          Cash<br><em>Flow</em><br>Analysis
+        </h1>
+
+        <div class="sidebar-target">
+          Predicting
+          <span>{{ target }}</span>
+        </div>
+
+      </div>
+
+      <div class="sidebar-bottom">
+
+        <div class="sidebar-rule"></div>
+
+        <a href="/" class="back-link">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M9 2L4 7L9 12"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          New forecast
+        </a>
+
+      </div>
+
+    </aside>
+
+    <!-- ── MAIN ── -->
+    <main class="main">
+
+      <!-- Chart -->
+      <div class="chart-section">
+        <p class="section-label">Projection Overview</p>
+        <div class="chart-wrap">
+          <canvas id="forecastChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-section">
+        <p class="section-label">Forecast Table</p>
+        <div class="table-wrap">
+          <table class="forecast-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Predicted {{ target }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in forecast_table %}
+              <tr>
+                <td>{{ row["Date"] }}</td>
+                <td>{{ row["Predicted " + target] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+      var labels           = {{ labels | tojson | safe }};
+      var historicalSeries = {{ historical_series | tojson | safe }};
+      var forecastSeries   = {{ forecast_series | tojson | safe }};
+
+      var ctx = document.getElementById('forecastChart');
+      if (!ctx) return;
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label:                'Historical',
+              data:                 historicalSeries,
+              borderColor:          '#2e2a25',
+              backgroundColor:      'rgba(46, 42, 37, 0.06)',
+              borderWidth:          2,
+              pointRadius:          3,
+              pointBackgroundColor: '#2e2a25',
+              tension:              0.4,
+              fill:                 true
+            },
+            {
+              label:                'Forecast',
+              data:                 forecastSeries,
+              borderColor:          '#c27a5a',
+              backgroundColor:      'rgba(194, 122, 90, 0.08)',
+              borderWidth:          2,
+              borderDash:           [6, 4],
+              pointRadius:          3,
+              pointBackgroundColor: '#c27a5a',
+              tension:              0.4,
+              fill:                 true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: {
+            mode:      'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              labels: {
+                font:      { family: 'DM Sans', size: 12 },
+                color:     '#7a7168',
+                boxWidth:  14,
+                boxHeight: 2
+              }
+            },
+            tooltip: {
+              backgroundColor: '#2e2a25',
+              titleFont:       { family: 'DM Sans', size: 12 },
+              bodyFont:        { family: 'DM Sans', size: 12 },
+              titleColor:      '#f5f0e8',
+              bodyColor:       'rgba(245, 240, 232, 0.7)',
+              padding:         12,
+              cornerRadius:    8,
+              borderColor:     'rgba(245, 240, 232, 0.08)',
+              borderWidth:     1
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color:      'rgba(214, 205, 192, 0.4)',
+                drawBorder: false
+              },
+              ticks: {
+                font:  { family: 'DM Sans', size: 11 },
+                color: '#7a7168'
+              }
+            },
+            y: {
+              grid: {
+                color:      'rgba(214, 205, 192, 0.4)',
+                drawBorder: false
+              },
+              ticks: {
+                font:  { family: 'DM Sans', size: 11 },
+                color: '#7a7168'
+              }
+            }
+          }
+        }
+      });
+
+    });
+  </script>
+
+</main>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const labels = {{ labels | tojson | safe }};
+  const historicalSeries = {{ historical_series | tojson | safe }};
+  const forecastSeries = {{ forecast_series | tojson | safe }};
+
+  const ctx = document.getElementById("forecastChart");
+
+  if (!ctx) return;
+
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Historical",
+          data: historicalSeries,
+          borderColor: "#2e2a25",
+          backgroundColor: "rgba(46,42,37,0.06)",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: "#2e2a25",
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: "Forecast",
+          data: forecastSeries,
+          borderColor: "#c27a5a",
+          backgroundColor: "rgba(194,122,90,0.08)",
+          borderWidth: 2,
+          borderDash: [6,4],
+          pointRadius: 3,
+          pointBackgroundColor: "#c27a5a",
+          tension: 0.4,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          labels: {
+            font: {
+              family: "DM Sans",
+              size: 12
+            },
+            color: "#7a7168",
+            boxWidth: 14,
+            boxHeight: 2
+          }
+        },
+        tooltip: {
+          backgroundColor: "#2e2a25",
+          titleFont: {
+            family: "DM Sans",
+            size: 12
+          },
+          bodyFont: {
+            family: "DM Sans",
+            size: 12
+          },
+          titleColor: "#f5f0e8",
+          bodyColor: "rgba(245,240,232,0.7)",
+          padding: 12,
+          cornerRadius: 8,
+          borderColor: "rgba(245,240,232,0.08)",
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: "rgba(214,205,192,0.4)",
+            drawBorder: false
+          },
+          ticks: {
+            font: {
+              family: "DM Sans",
+              size: 11
+            },
+            color: "#7a7168"
+          }
+        },
+        y: {
+          grid: {
+            color: "rgba(214,205,192,0.4)",
+            drawBorder: false
+          },
+          ticks: {
+            font: {
+              family: "DM Sans",
+              size: 11
+            },
+            color: "#7a7168"
+          }
+        }
+      }
+    }
+  });
+
+});
+</script>
+</body>
+</html>
